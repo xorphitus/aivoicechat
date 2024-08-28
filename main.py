@@ -6,6 +6,7 @@ import subprocess
 
 MODEL = "llama3.1:8b-instruct-q6_K"
 SPEAKER = "1"
+HISTORY_MAX = 8
 
 def is_process_running(process_name):
     return True
@@ -19,7 +20,7 @@ def play(text):
         return False
 
     audio_query_response = audio_query_response.json()
-    audio_query_response['speedScale'] *= 1.4
+    audio_query_response['speedScale'] *= 1.35
 
     response = requests.post(f"http://localhost:50021/synthesis?speaker={SPEAKER}", json=audio_query_response)
     if response.status_code != 200:
@@ -33,6 +34,8 @@ def play(text):
     return True
 
 def main():
+    history = []
+
     while True:
         if not is_process_running('voicevox') or not is_process_running('ollama'):
             print("Required processes are not running.")
@@ -40,12 +43,16 @@ def main():
 
         user_input = input(">>> ")
 
+        history.append({
+            "role": "user", "content": user_input
+        })
+        if len(history) > HISTORY_MAX:
+            history = history[1:]
+
         ollama_request = {
             "model": MODEL,
             "stream": False,
-            "messages": [
-                { "role": "user", "content": user_input }
-            ]
+            "messages": history,
         }
         response = requests.post("http://localhost:11434/api/chat", json=ollama_request)
         if response.status_code != 200:
@@ -54,6 +61,10 @@ def main():
             continue
 
         reply = response.json().get("message", {}).get("content")
+        history.append({
+            "role": "assistant", "content": reply
+        })
+
         if not reply:
             print("No 'message.content' found in the response.")
             print(response.json())
