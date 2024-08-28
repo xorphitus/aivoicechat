@@ -8,8 +8,25 @@ MODEL = "llama3.1:8b-instruct-q6_K"
 SPEAKER = "1"
 HISTORY_MAX = 8
 
-def is_process_running(process_name):
-    return True
+def is_ready():
+    response = requests.get("http://localhost:50021")
+    if response.status_code != 200:
+        print("Voicevox is not running")
+        return False
+
+    response = requests.get("http://localhost:11434/api/ps")
+    if response.status_code != 200:
+        print("Ollama is not running")
+        return False
+
+    ps = response.json()
+    for model in ps['models']:
+        if model['name'] == MODEL:
+            return True
+
+    print('Ollama is running, but the model is not running')
+
+    return False
 
 def play(text):
     encoded_text = urllib.parse.quote(text)
@@ -37,8 +54,7 @@ def main():
     history = []
 
     while True:
-        if not is_process_running('voicevox') or not is_process_running('ollama'):
-            print("Required processes are not running.")
+        if not is_ready():
             return
 
         user_input = input(">>> ")
